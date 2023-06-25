@@ -2,6 +2,7 @@ package aquahood.model;
 
 import aquahood.Constants;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class Fish {
@@ -9,7 +10,7 @@ public class Fish {
     public Direction dir;
     public Position pos;
     public double angle;
-
+    public double speed;
 
     private double max_width = Constants.SCENE_WIDTH;
     private double max_height = Constants.SCENE_HEIGHT;
@@ -17,12 +18,19 @@ public class Fish {
     private double centerX = Constants.SCENE_WIDTH/2;
     private double centerY = Constants.SCENE_HEIGHT/2;
     public double radius = (Constants.MAJOR_RADIUS + Constants.MINOR_RADIUS) / 2;
-    private double angularSpeed = 0.005; // controls the speed of rotation
+    private double angularSpeed = 0.005;
+    private double avoidRadius = 20;
 
     private boolean colliding = false;
     public Fish() {
         angle = Math.random() * 2 * Math.PI; // random initial angle
-        updatePosition();
+        speed = angularSpeed;
+
+        this.angle = 2 * Math.PI * Math.random();
+        this.angularSpeed = (Math.random() - 0.5) / 30;
+        this.pos = new Position(centerX + radius * Math.cos(angle), centerY + radius * Math.sin(angle));
+        this.dir = new Direction(Math.cos(angle), Math.sin(angle));
+        updateDirection(new ArrayList<>());
 
     }
 
@@ -31,52 +39,79 @@ public class Fish {
         this.max_height = height;
     }
 
-    public void updatePosition() {
-        // Increment the angle
-        angle += angularSpeed;
-
-        // Compute the new position
-        double x = centerX + radius * Math.cos(angle);
-        double y = centerY + radius * Math.sin(angle);
-
-        // Update position and direction
-        pos = new Position(x, y);
-
-    }
-
     public void updateDirection(List<Fish> closeFish){
         colliding = closeFish.size() != 0;
         Direction correction = new Direction(0,0);
-        Direction flockDirection = new Direction(0,0);
-        Direction flockCenter = new Direction(dir.x, dir.y);
+        Direction avoidance = new Direction(0, 0);
+
+        double avoidanceFactor = 0.05; // Controls the strength of avoidance
 
         for (Fish otherB : closeFish){
-            /* collision avoidance */
             Direction distanceVector = Direction.fromPositions(otherB.pos, pos);
             double distance = distanceVector.norm();
-            double scaleFactor = (Constants.MAX_DISTANCE_DETECTION - distance)
-                / Constants.MAX_DISTANCE_DETECTION;
-            // correction.add(distanceVector.scaleBy(-scaleFactor));
 
-            Direction normalProj = distanceVector.projectOn(dir);
-            normalProj.sub(distanceVector);
-            correction.add(normalProj.scaleBy(scaleFactor));
-
-            /* flock direcion */
-            flockDirection.add(otherB.dir);
-
-            /* flock center */
-            flockCenter.add(new Direction(otherB.pos.x, otherB.pos.y));
+            if (distance < avoidRadius) {
+                double dx = pos.x - otherB.pos.x;
+                double dy = pos.y - otherB.pos.y;
+                double factor = (avoidRadius - distance) /avoidRadius;
+                avoidance.add(new Direction(dx * factor, dy * factor));
+            }
         }
-        Direction dirToCenter = flockCenter.scaleBy(closeFish.size());
-        dirToCenter.sub(new Direction(dir.x, dir.y));
 
-        // dir.add(dirToCenter.scaleBy(0.01));
-        dir.add(correction.scaleBy(0.01));
-        // dir.add(flockDirection.scaleBy(0.001));
+        dir.add(avoidance.scaleBy(avoidanceFactor));
         dir.normalize();
         updateAngle();
     }
+
+
+
+    public void updatePosition(List<Fish> closeFish) {
+        // Compute avoidance force
+        double avoidanceX = 0;
+        double avoidanceY = 0;
+
+        for (Fish otherFish : closeFish) {
+            double distance = Math.sqrt(Math.pow(otherFish.pos.x - this.pos.x, 2) + Math.pow(otherFish.pos.y - this.pos.y, 2));
+            if (distance < avoidRadius) {
+                double dx = this.pos.x - otherFish.pos.x;
+                double dy = this.pos.y - otherFish.pos.y;
+                avoidanceX += dx / distance;
+                avoidanceY += dy / distance;
+            }
+        }
+
+        // Normalize the avoidance vector
+        double avoidanceMagnitude = Math.sqrt(avoidanceX * avoidanceX + avoidanceY * avoidanceY);
+        if (avoidanceMagnitude > 0) {
+            avoidanceX /= avoidanceMagnitude;
+            avoidanceY /= avoidanceMagnitude;
+        }
+
+        // Calculate angle adjustment based on avoidance, but keep the forward movement
+        double angleAdjustment = 0.01 * Math.atan2(avoidanceY, avoidanceX);
+
+        // Increment angle by angular speed and avoidance adjustment
+        angle += angularSpeed + angleAdjustment;
+        angularSpeed += Math.abs(0.05 * Math.atan2(avoidanceY, avoidanceX));
+
+        // Compute new position based on the angle and radius
+        pos.x = centerX + radius * Math.cos(angle);
+        pos.y = centerY + radius * Math.sin(angle);
+
+        // Make sure the fish stays between circle1 and circle2
+        double distanceToCenter = Math.sqrt((pos.x - centerX) * (pos.x - centerX) + (pos.y - centerY) * (pos.y - centerY));
+        if (distanceToCenter < Constants.MINOR_RADIUS) {
+            radius = Constants.MINOR_RADIUS;
+        } else if (distanceToCenter > Constants.MAJOR_RADIUS) {
+            radius = Constants.MAJOR_RADIUS;
+        } else {
+            radius = distanceToCenter;
+        }
+    }
+
+
+
+
 
 
     private void updateAngle() {

@@ -59,14 +59,13 @@ public class App extends Application {
     private void runSimulation(){
         fishGeneratorUi.setCanvasSize(
             Constants.SCENE_WIDTH, Constants.SCENE_HEIGHT);
-        gameloop = new AnimationTimer() {
+                gameloop = new AnimationTimer() {
 
             @Override
             public void handle(long now) {
                 if ((now - lastUpdateTime) >= 100000000/ Constants.FPS) {
                     lastUpdateTime = now;
                     fishGeneratorUi.update();
-                    System.out.println("FPS: ");
                 }
             }
         };

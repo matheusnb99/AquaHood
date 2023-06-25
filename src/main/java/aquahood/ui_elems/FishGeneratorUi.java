@@ -29,10 +29,9 @@ public class FishGeneratorUi extends Pane {
     }
 
     public void update(){
-        //fishGenerator.updateBoidsDirections();
-        // fishGenerator.updateBoidsPositions();
+        //fishGenerator.updateFishDirections();
+        fishGenerator.updateFishPositions();
 
-        fishGenerator.getBoids().forEach(Fish::updatePosition);
         boidsShapes.forEach(FishUi::draw);
     }
     
